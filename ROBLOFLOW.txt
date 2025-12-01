@@ -1,0 +1,8 @@
+!pip install roboflow
+
+from roboflow import Roboflow
+rf = Roboflow(api_key="P9GYH7km04bMyLKKA3tQ")
+project = rf.workspace("entrenamiento1-wvwq3").project("project_object_yolo11-a0dov")
+version = project.version(1)
+dataset = version.download("yolov11")
+                
