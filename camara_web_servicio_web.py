@@ -7,9 +7,9 @@ os.system('clear')
 
 app = Flask(__name__)
 model = YOLO("best.pt")
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(10)
 
-SAVE_PATH = "/home/icam-540/captura/captura_sin_tapa.jpg"   # ruta donde guardar
+SAVE_PATH = "/home/icam-540/capturas/captura_sin_tapa.jpg"   # ruta donde guardar
 
 
 def generate():
@@ -48,4 +48,4 @@ def video():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8090)
+    app.run(host='0.0.0.0', port=8080)

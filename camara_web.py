@@ -1,17 +1,14 @@
-import os 
 import cv2
 from ultralytics import YOLO
-os.system('clear')
+from CamNavi2 import CamNavi2
 
-
-
-SAVE_PATH = "/home/icam-540/captura/captura_sin_tapa_2.jpg"   # ruta donde guardar
+SAVE_PATH = "/home/icam-540/capturas/captura_sin_tapa_2.jpg"   # ruta donde guardar
 
 
 def main():
-    
+      
     model = YOLO("best.pt")
-    cap=cv2.VideoCapture(0)
+    cap=cv2.VideoCapture(10)
     while cap.isOpened():
         # Leemos el frame del video
         ret, frame = cap.read()
@@ -21,8 +18,22 @@ def main():
         results = model(frame)
         # Extraemos los resultados
         annotated_frame = results[0].plot()
-        #print(annotated_frame)
+
+        print(results[0].boxes)
+
+        #print(annotated_frame)\']'-=-?><|":{}_++++"
         # Visualizamos los resultados
+
+        detected_classes = results[0].boxes.cls.tolist()  # IDs detectados
+
+        # Buscar si el nombre "Sin_Tapa" aparece
+        for cls_id in detected_classes:
+            class_name = results[0].names[int(cls_id)]
+            if class_name == "Sin_Tapa":
+                cv2.imwrite(SAVE_PATH, annotated_frame)
+               
+                break
+
 
         detected_classes = results[0].boxes.cls.tolist()  # IDs detectados
 
@@ -40,6 +51,8 @@ def main():
             break
     cap.release() 
     cv2.destroyAllWindows()
+
+
 
 
 
