@@ -12,7 +12,7 @@ MODEL_PATH = "best.pt"
 SAVE_PATH = "/home/icam-540/capturas/captura_sin_tapa_2.jpg"
 
 WIDTH  = 1920
-HEIGHT = 1080
+HEIGHT = 1080 #Resolucion 
 YOLO_SIZE = 600   # tamaño para inferencia
 # ==========================================
 
