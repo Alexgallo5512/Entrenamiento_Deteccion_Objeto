@@ -17,20 +17,19 @@ from ultralytics import YOLO
 MODEL_PATH = "best.pt"
 
 # ✅ Rutas Compatible Windows/Linux
-CAPTURAS_DIR = Path("capturas")
-CAPTURAS_DIR.mkdir(exist_ok=True)
-SAVE_PATH = CAPTURAS_DIR / "captura_sin_tapa.jpg"
+SAVE_PATH = "/home/icam-540/capturas/captura_sin_tapa.jpg"
 
 # Resolución cámara (reducida para mejor rendimiento)
-WIDTH  = 1280   # Antes: 1920 (- 33% = más rápido)
-HEIGHT = 720    # Antes: 1080 (- 33% = más rápido)
-
+#WIDTH  = 1280   
+#HEIGHT = 720   
+WIDTH  = 640   
+HEIGHT = 640   
 # Tamaño YOLO (pequeño = procesamiento rápido)
 YOLO_SIZE = 480 
-YOLO_CONF = 0.5  # Confianza mínima (> 0.5 = más rápido)
+YOLO_CONF = 0.3  # Confianza mínima (> 0.5 = más rápido)
 
 # FPS objetivo
-TARGET_FPS = 30
+TARGET_FPS = 40
 
 # ================= VARIABLES GLOBALES =================
 model = YOLO(MODEL_PATH)
@@ -174,8 +173,7 @@ if __name__ == "__main__":
             results = model(
                 resized, 
                 verbose=False,
-                conf=YOLO_CONF,  # Confianza mínima = más rápido
-                device=0  # GPU si disponible
+                conf=YOLO_CONF  # Confianza mínima = más rápido
             )
 
             yolo_count += 1
@@ -195,10 +193,10 @@ if __name__ == "__main__":
 
             # -------- MOSTRAR EN PANTALLA --------
             # Agregar info de FPS
-            info_text = f"CAM: {cam_fps} FPS | YOLO: {yolo_fps} FPS"
+            #info_text = f"CAM: {cam_fps} FPS | YOLO: {yolo_fps} FPS"
             cv2.putText(
                 annotated, 
-                info_text, 
+                '', 
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
