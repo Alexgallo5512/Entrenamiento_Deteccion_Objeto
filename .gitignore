@@ -3,3 +3,6 @@ venv/
 yolo_env/
 __pycache__/
 *.pyc
+.venv/
+*.pyo
+ANALISIS_Y_RECOMENDACIONES.md
