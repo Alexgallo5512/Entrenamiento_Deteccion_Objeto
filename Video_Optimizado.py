@@ -23,7 +23,8 @@ SAVE_PATH = "/home/icam-540/capturas/captura_sin_tapa.jpg"
 WIDTH  = 1280   
 HEIGHT = 720   
 # Tamaño YOLO (pequeño = procesamiento rápido)
-YOLO_SIZE = 480 
+YOLO_SIZE_W = 640 
+YOLO_SIZE_H = 480 
 YOLO_CONF = 0.3  # Confianza mínima (> 0.5 = más rápido)
 
 # FPS objetivo
@@ -45,6 +46,9 @@ last_fps_time = time.time()
 
 icam_color = 0
 
+gain =1
+sharpness =5
+brightness =10
 # ================= FUNCIONES =================
 
 def gst_to_opencv(sample):
@@ -133,33 +137,44 @@ if __name__ == "__main__":
         cn2.advcam_config_pipeline(camera, **pipe_params)
         cn2.advcam_open(camera, -1)
         cn2.advcam_register_new_image_handler(camera, new_image_handler)
-
+        camera.dio.do0.op_mode = 0
+        camera.dio.do0.user_output = 0 # DO low, DI high
+        print("DO lOW " + str(camera.dio.do0.user_output))
+        camera.dio.do0.reverse = 0
         # ========== CONFIGURACIÓN ÓPTICA ==========
         camera.lighting.selector = 2
-        camera.lighting.gain = 100
-        cn2.advcam_set_img_sharpness(camera, 90)
-        cn2.advcam_set_img_brightness(camera, 50)
-        cn2.advcam_set_img_gain(camera, 5)
+        camera.lighting.gain = 40
+
+        camera.image.saturation = 119
+        camera.image.gamma = 24
+        
+        cn2.advcam_set_img_sharpness(camera, 15)
+        cn2.advcam_set_img_brightness(camera, 80)
+        cn2.advcam_set_img_gain(camera, 6)
+
         camera.set_acq_frame_rate(TARGET_FPS)
 
         # ========== INICIAR CAPTURA ==========
         
         camera.focus.pos_zero()
         time.sleep(0.5)
+        camera.focus.distance = 65
         i = 0
-        while i < 30:
+        while i < 7:
+            
             camera.focus.direction = 1 # lens focusing motor backward
             try:
-                camera.focus.distance = 30
+                camera.focus.distance = 100
                 print("lens motor posistion: ", camera.focus.position())
                 i+=1
                 print("valor ", i)
             except ValueError:
                 print("lens position out of index")
+        
         cn2.advcam_play(camera)
         print("▶️  Sistema iniciado. Presiona ESC para salir")
         print(f"   📊 Resolución cámara: {WIDTH}x{HEIGHT}")
-        print(f"   🧠 Tamaño YOLO: {YOLO_SIZE}x{YOLO_SIZE}")
+        print(f"   🧠 Tamaño YOLO: {YOLO_SIZE_W}x{YOLO_SIZE_H}")
         print(f"   ⚙️  Confianza YOLO: {YOLO_CONF}")
         print()
 
@@ -174,11 +189,11 @@ if __name__ == "__main__":
 
             # -------- REDIMENSIONAR PARA YOLO --------
             # IMPORTANTE: esto acelera mucho la inferencia
-            resized = cv2.resize(frame, (YOLO_SIZE, YOLO_SIZE))
+            resized = cv2.resize(frame, (YOLO_SIZE_W, YOLO_SIZE_H))
             
             # -------- INFERENCIA YOLO --------
             results = model(
-                resized, 
+               resized, 
                 verbose=False,
                 conf=YOLO_CONF  # Confianza mínima = más rápido
             )
@@ -198,19 +213,7 @@ if __name__ == "__main__":
                     detected = True
                     break
 
-            # -------- MOSTRAR EN PANTALLA --------
-            # Agregar info de FPS
-            #info_text = f"CAM: {cam_fps} FPS | YOLO: {yolo_fps} FPS"
-            cv2.putText(
-                annotated, 
-                '', 
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2
-            )
-            
+         
             cv2.imshow("iCAM-540 + YOLO (Optimizado)", annotated)
 
             # -------- CONTAR FPS --------
@@ -228,23 +231,106 @@ if __name__ == "__main__":
             if key == 27:  # ESC
                 print("\n⏹️  Deteniendo...")
                 break
-            elif key == ord('+') or key == ord('='):  # Enfoque adelante
+            elif key == ord('a') or key == ord('A'):  # Enfoque RETROCEDE
                 try:
                     camera.focus.direction = 0
-                    camera.focus.distance = 30
-                    print("🔍 Enfoque: Adelante")
+                    camera.focus.distance = 5
+                    print("lens motor Retrocede posistion: ", camera.focus.position())
                 except:
                     pass
-            elif key == ord('-'):  # Enfoque atrás
+            elif key == ord('b') or key == ord('B'):  # Enfoque ADELANTA
                 try:
                     camera.focus.direction = 1
-                    camera.focus.distance = 30
-                    print("🔍 Enfoque: Atrás")
+                    camera.focus.distance = 5
+                    print("lens motor Adelante posistion: ", camera.focus.position())
                 except:
                     pass
+
+                #GAIN
+            elif key == ord('n') or key == ord('N'):  # GAIN AUMENTAR
+                try:
+
+                    gain_a = cn2.advcam_get_img_gain(camera)
+                    gain_a = gain_a + gain
+                    cn2.advcam_set_img_gain(camera, gain_a)
+                    print("gain aumento: ", cn2.advcam_get_img_gain(camera))
+                except Exception as e:
+                    print(f"❌ Error gain  a: {e}")
+                    pass
+            elif key == ord('m') or key == ord('M'):  # GAIN DISMINUIR
+                try:
+
+                    gain_a = cn2.advcam_get_img_gain(camera)
+                    gain_a = gain_a - gain
+                    cn2.advcam_set_img_gain(camera, gain_a)
+                    print("gain disminuir: ", cn2.advcam_get_img_gain(camera))
+                except Exception as e:
+                    print(f"❌ Error gain d: {e}")
+                    pass
+
+                #SHARPNESS
+            elif key == ord('v') or key == ord('V'):  # SHARPNESS AUMENTAR
+                try:
+
+                    sharpness_a = cn2.advcam_get_img_sharpness(camera)
+                    sharpness_a = sharpness_a + sharpness
+                    cn2.advcam_set_img_sharpness(camera, sharpness_a)
+                    print("sharpness aumento: ", cn2.advcam_get_img_sharpness(camera))
+                except Exception as e:
+                    print(f"❌ Error sharpness  a: {e}")
+                    pass
+            elif key == ord('c') or key == ord('C'):  # SHARPNESS DISMINUIR
+                try:
+
+                    sharpness_a = cn2.advcam_get_img_sharpness(camera)
+                    sharpness_a = sharpness_a - sharpness
+                    cn2.advcam_set_img_sharpness(camera, sharpness_a)
+                    print("sharpness disminuir: ", cn2.advcam_get_img_sharpness(camera))
+                except Exception as e:
+                    print(f"❌ Error sharpness d: {e}")
+                    pass
+
+
+
+                #BRIGTHNESS
+            elif key == ord('x') or key == ord('X'):  # BRIGTHNESS AUMENTAR
+                try:
+
+                    brightness_a = cn2.advcam_get_img_brightness(camera)
+                    brightness_a = brightness_a + brightness
+                    cn2.advcam_set_img_brightness(camera, brightness_a)
+                    print("brightness aumento: ", cn2.advcam_get_img_brightness(camera))
+                except Exception as e:
+                    print(f"❌ Error brightness  a: {e}")
+                    pass
+            elif key == ord('z') or key == ord('X'):  # BRIGTHNESS DISMINUIR
+                try:
+
+                    brightness_a = cn2.advcam_get_img_brightness(camera)
+                    brightness_a = brightness_a - brightness
+                    cn2.advcam_set_img_brightness(camera, brightness_a)
+                    print("brightness disminuir: ", cn2.advcam_get_img_brightness(camera))
+                except Exception as e:
+                    print(f"❌ Error brightness d: {e}")
+                    pass    
             elif key == ord('s'):  # Captura manual
                 if latest_frame is not None:
                     save_detection(annotated, "Manual")
+            elif key == ord('t'):  
+                    
+                    camera.dio.do0.user_output = 1
+                    salida  = str(camera.dio.do0.user_output)
+                    print("DO high " + salida)
+                    #camera.dio.do0.user_output = 1 # DO high, DI low
+                    level =  camera.dio.di0.level
+                    print(level)
+            elif key == ord('r'):  
+                    camera.dio.do0.user_output = 0
+                    salida  = str(camera.dio.do0.user_output)
+                    print("DO low " + salida)
+                    #camera.dio.do0.user_output = 1 # DO high, DI low
+                    level =  camera.dio.di0.level
+                    print(level)
 
     except Exception as e:
         print(f"❌ Error: {e}")

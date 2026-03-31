@@ -23,7 +23,7 @@ FILE_NAME = "captura_sin_tapa.jpg"
 WIDTH  = 1280   
 HEIGHT = 720   
 # Tamaño YOLO (pequeño = procesamiento rápido)
-YOLO_SIZE = 480 
+YOLO_SIZE = 640 
 YOLO_CONF = 0.3  # Confianza mínima (> 0.5 = más rápido)
 
 # FPS objetivo
@@ -76,10 +76,7 @@ def new_image_handler(sample):
             latest_frame = frame
 
         cam_count += 1
-        filepath = os.path.join(SAVE_PATH, FILE_NAME)
-        cv2.imwrite(filepath, latest_frame)
-
-        print("📸 Imagen guardada:", filepath)
+       
     except Exception as e:
         print(f"❌ Error en callback cámara: {e}")
 
@@ -155,11 +152,12 @@ if __name__ == "__main__":
         time.sleep(0.5)
         
         i = 0
-        while i < 30:
+        while i < 12:
             camera.focus.direction = 1 # lens focusing motor backward
             try:
-                camera.focus.distance = 30
+                camera.focus.distance = 80
                 print("lens motor posistion: ", camera.focus.position())
+                time.sleep(0.5) 
                 i+=1
                 print("valor ", i)
             except ValueError:
@@ -181,15 +179,16 @@ if __name__ == "__main__":
                     time.sleep(0.01)  # Esperar frame
                     continue
                 else:
-                     frame = '/home/icam-540/capturas/captura_sin_tapa.jpg'
+                     frame = latest_frame.copy()
+                     # frame = '/home/icam-540/capturas/captura_sin_tapa.jpg'
 
             # -------- REDIMENSIONAR PARA YOLO --------
             # IMPORTANTE: esto acelera mucho la inferencia
-                #resized = cv2.resize(frame, (YOLO_SIZE, YOLO_SIZE))
+                resized = cv2.resize(frame, (YOLO_SIZE, YOLO_SIZE))
             
             # -------- INFERENCIA YOLO --------
                 results = model(
-                    frame, 
+                    resized, 
                     verbose=True,
                     conf=YOLO_CONF  # Confianza mínima = más rápido
                 )
