@@ -33,7 +33,6 @@ TARGET_FPS = 40
 # ================= VARIABLES GLOBALES =================
 model = YOLO(MODEL_PATH)
 
-frame_lock = threading.Lock()
 latest_frame = None
 detection_event = threading.Event()
 
@@ -49,6 +48,7 @@ icam_color = 0
 gain =1
 sharpness =5
 brightness =10
+resized_2 = None
 # ================= FUNCIONES =================
 
 def gst_to_opencv(sample):
@@ -75,9 +75,7 @@ def new_image_handler(sample):
 
     try:
         frame = gst_to_opencv(sample)
-        
-        with frame_lock:
-            latest_frame = frame
+        latest_frame = frame
 
         cam_count += 1
         
@@ -142,8 +140,8 @@ if __name__ == "__main__":
         print("DO lOW " + str(camera.dio.do0.user_output))
         camera.dio.do0.reverse = 0
         # ========== CONFIGURACIÓN ÓPTICA ==========
-        camera.lighting.selector = 2
-        camera.lighting.gain = 40
+        camera.lighting.selector = 3
+        camera.lighting.gain = 10
 
         camera.image.saturation = 119
         camera.image.gamma = 24
@@ -177,44 +175,84 @@ if __name__ == "__main__":
         print(f"   🧠 Tamaño YOLO: {YOLO_SIZE_W}x{YOLO_SIZE_H}")
         print(f"   ⚙️  Confianza YOLO: {YOLO_CONF}")
         print()
-
+        bandera = False
         # ================= LOOP PRINCIPAL =================
         while True:
-            # Obtener frame más reciente (con lock)
-            with frame_lock:
-                if latest_frame is None:
-                    time.sleep(0.01)  # Esperar frame
-                    continue
-                frame = latest_frame.copy()
+            if latest_frame is not None:
 
             # -------- REDIMENSIONAR PARA YOLO --------
             # IMPORTANTE: esto acelera mucho la inferencia
-            resized = cv2.resize(frame, (YOLO_SIZE_W, YOLO_SIZE_H))
-            
-            # -------- INFERENCIA YOLO --------
-            results = model(
-               resized, 
-                verbose=False,
-                conf=YOLO_CONF  # Confianza mínima = más rápido
-            )
+                resized = cv2.resize(latest_frame, (YOLO_SIZE_W, YOLO_SIZE_H))
 
-            yolo_count += 1
+                if resized_2 is not None:
+                    diff = cv2.absdiff(resized,resized_2)
+                    gray = cv2.cvtColor(diff,cv2.COLOR_BGR2GRAY)
+
+                    _, thresh = cv2.threshold(gray,15,255,cv2.THRESH_BINARY)
+
+                    porcentaje = np.sum(thresh > 0) / thresh.size
+                    print(porcentaje)
+                    if porcentaje > 0.07:
+                        bandera = False
+
+                escala_x = 190
+                escala_y = 110
+
+
+                yolo_count += 1
+
+                if bandera == False:
+
+                  # -------- INFERENCIA YOLO --------
+                    results = model(
+                    resized, 
+                    verbose=False,
+                    conf=YOLO_CONF  # Confianza mínima = más rápido
+                    )
 
             # -------- DIBUJAR RESULTADOS --------
-            annotated = results[0].plot()
+                    annotated = results[0].plot()
 
             # -------- LÓGICA DE DETECCIÓN --------
-            detected = False
-            for cls_id in results[0].boxes.cls.tolist():
-                class_name = results[0].names[int(cls_id)]
-                if class_name == "Sin_Tapa":
-                    print(f"🎯 Objeto detectado: {class_name}")
-                    save_detection(annotated, class_name)
-                    detected = True
-                    break
+                    detected = False
+                    for i,cls_id in enumerate(results[0].boxes.cls.tolist()):
+                            class_name = results[0].names[int(cls_id)]
+                            if class_name == "Sin_Tapa":
+                                print(f"🎯 Objeto detectado: {class_name}")
+                                x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
+                                cx = int((x1 + x2 )/ 2)
+                                cy = int((y1 + y2 )/ 2)
+                                cv2.circle(annotated,(cx,cy),10,(0,0,255), 2)
+                                cx = cx * escala_x
+                                cy = cy * escala_y
+                                print(f"Objeto Sin tapa en X:{cx}, Y {cy}")
+                                
+                                #save_detection(frame_yolo, class_name)
+                                resized_2 = resized 
+                                bandera = True
 
-         
-            cv2.imshow("iCAM-540 + YOLO (Optimizado)", annotated)
+                            if class_name == "Con_Tapa":
+                                print(f"🎯 Objeto detectado: {class_name}")
+                                x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
+                                cx = int((x1 + x2 )/ 2)
+                                cy = int((y1 + y2 )/ 2)
+                                cv2.circle(annotated,(int(x1),int(y1)),10,(255,34,234), 2)
+                                cv2.circle(annotated,(int(x2),int(y2)),10,(195,4,10), 2)
+                                cv2.circle(annotated,(cx,cy),10,(255,0,0), 2)
+                                #cx = cx * escala_x
+                                #cy = cy * escala_y
+                               
+                                print(f"Objeto con tapa en X:{cx}, Y {cy}")
+                               
+                                resized_2 = resized 
+                                bandera = True
+
+                  
+                
+                if annotated is not None:
+                    cv2.imshow("iCAM-540 + YOLO (Optimizado)", annotated)
+                else:
+                    cv2.imshow("iCAM-540 + YOLO (Optimizado)", resized)
 
             # -------- CONTAR FPS --------
             now = time.time()
