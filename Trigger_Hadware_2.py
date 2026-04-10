@@ -224,6 +224,8 @@ if __name__ == '__main__':
     try:
         while True:
             if image_arr  is not None:
+                
+                resized = cv2.resize(image_arr, (YOLO_SIZE_W, YOLO_SIZE_H))
 
                 if resized_2 is not None:
 
@@ -237,7 +239,7 @@ if __name__ == '__main__':
                     if porcentaje > 0.07:
                         bandera_Yolo = False
 
-                resized = cv2.resize(image_arr, (YOLO_SIZE_W, YOLO_SIZE_H))
+               
                 #cv2.imshow("Vista Camara",image_arr) 
                 image_arr = None
 
@@ -258,9 +260,9 @@ if __name__ == '__main__':
                             #save_detection(frame_yolo, class_name)
                             count_sin_tapa+=1
                             count_rechazo = 0
-                            camera.dio.do0.user_output = 1
-                            salida  = str(camera.dio.do0.user_output)
-                            print("DO high " + salida)
+                            #camera.dio.do0.user_output = 1
+                            #salida  = str(camera.dio.do0.user_output)
+                            #print("DO high " + salida)
                             x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
                             calculo_posicion_obj(x1,y1,x2,y2,class_name)
                         if class_name == "Con_Tapa":
@@ -313,10 +315,33 @@ if __name__ == '__main__':
 
                 if ultimo_frame is not None :
                     cv2.imshow("Vista Camara",ultimo_frame)
-                    
+
+                key = cv2.waitKey(1) & 0xFF
+
+                if key == ord('-'): 
+                    cv2.destroyAllWindows()
+                    image_arr = None
+                elif key == ord('t'):  
+                    count_rechazo = 0
+                    camera.dio.do0.user_output = 1
+                    salida  = str(camera.dio.do0.user_output)
+                    print("DO high " + salida)
+                    #camera.dio.do0.user_output = 1 # DO high, DI low
+                    level =  camera.dio.di0.level
+                    print(level)
+                elif key == ord('r'):  
+                    camera.dio.do0.user_output = 0
+                    salida  = str(camera.dio.do0.user_output)
+                    print("DO low " + salida)
+                    #camera.dio.do0.user_output = 1 # DO high, DI low
+                    level =  camera.dio.di0.level
+                    print(level)
+
+
                 if  cv2.waitKey(1) & 0xFF == 27:
                     break
 
+                
                 time.sleep(0.1)  
 
     except KeyboardInterrupt:

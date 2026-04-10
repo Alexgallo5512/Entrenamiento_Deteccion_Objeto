@@ -4,7 +4,7 @@
 🎯 SCRIPT OPTIMIZADO PARA iCAM-540 + YOLO
 Basado en Video_10_YOlO.py con mejoras de rendimiento
 """
-
+import sys
 import cv2
 import numpy as np
 import time
@@ -12,6 +12,11 @@ import threading
 import os
 from pathlib import Path
 from ultralytics import YOLO
+import torch 
+print("Python:", sys.executable)
+
+print("CUDA disponible:", torch.cuda.is_available())
+print("Dispositivo:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")
 
 # ================= CONFIGURACIÓN =================
 MODEL_PATH = "best.pt"
@@ -25,14 +30,14 @@ HEIGHT = 720
 # Tamaño YOLO (pequeño = procesamiento rápido)
 YOLO_SIZE_W = 640 
 YOLO_SIZE_H = 480 
-YOLO_CONF = 0.3  # Confianza mínima (> 0.5 = más rápido)
+YOLO_CONF = 0.7  # Confianza mínima (> 0.5 = más rápido)
 
 # FPS objetivo
 TARGET_FPS = 40
 
 # ================= VARIABLES GLOBALES =================
 model = YOLO(MODEL_PATH)
-
+model.to("cuda")
 latest_frame = None
 detection_event = threading.Event()
 
@@ -50,6 +55,28 @@ sharpness =5
 brightness =10
 resized_2 = None
 # ================= FUNCIONES =================
+ultimo_frame = None
+frame_yolo = None
+resized = None
+
+def calculo_posicion_obj(x1,y1,x2,y2,class_name):
+    global frame_yolo
+   
+
+    cx = int((x1 + x2 )/ 2)
+    cy = int((y1 + y2 )/ 2)
+
+    if class_name == "Sin_Tapa":
+        cv2.circle(frame_yolo,(int(x1),int(y1)),10,(27,34,234), 2)
+        cv2.circle(frame_yolo,(int(x2),int(y2)),10,(19,4,10), 2)
+        cv2.circle(frame_yolo,(cx,cy),10,(255,0,0), 2)
+        print(f"Objeto sin tapa en X:{cx}, Y {cy}")
+    else:
+        cv2.circle(frame_yolo,(int(x1),int(y1)),10,(255,34,234), 2)
+        cv2.circle(frame_yolo,(int(x2),int(y2)),10,(195,4,10), 2)
+        cv2.circle(frame_yolo,(cx,cy),10,(255,0,0), 2)
+        print(f"Objeto con tapa en X:{cx}, Y {cy}")
+    
 
 def gst_to_opencv(sample):
     """Convierte formato SDK (GST) a formato OpenCV"""
@@ -96,7 +123,13 @@ def save_detection(frame, class_name="Sin_Tapa"):
 # ================= MAIN =================
 if __name__ == "__main__":
     print("🚀 Iniciando iCAM-540 + YOLO con threading...")
-    
+
+    bandera_Yolo = False
+    count_rechazo = 0
+    linea_cero = 0
+    linea_uno = 1
+    count_sin_tapa = 0
+    count_con_tapa = 0
     try:
         from CamNavi2 import CamNavi2
         try:
@@ -179,10 +212,11 @@ if __name__ == "__main__":
         # ================= LOOP PRINCIPAL =================
         while True:
             if latest_frame is not None:
-
-            # -------- REDIMENSIONAR PARA YOLO --------
-            # IMPORTANTE: esto acelera mucho la inferencia
-                resized = cv2.resize(latest_frame, (YOLO_SIZE_W, YOLO_SIZE_H))
+                count_rechazo+=1
+                if count_rechazo == 2 and  str(camera.dio.do0.user_output) == "1":
+                    camera.dio.do0.user_output = 0
+                    salida  = str(camera.dio.do0.user_output)
+                    print("DO Low " + salida)
 
                 if resized_2 is not None:
                     diff = cv2.absdiff(resized,resized_2)
@@ -193,76 +227,49 @@ if __name__ == "__main__":
                     porcentaje = np.sum(thresh > 0) / thresh.size
                     print(porcentaje)
                     if porcentaje > 0.07:
-                        bandera = False
+                        bandera_Yolo = False
+           
 
-                escala_x = 190
-                escala_y = 110
+                resized = cv2.resize(latest_frame, (YOLO_SIZE_W, YOLO_SIZE_H))
+
+                if bandera_Yolo == False:
+                    
+                    results = model(resized, verbose=False, conf=YOLO_CONF)    # conf -> Confianza mínima = más rápido
+
+                    frame_yolo = results[0].plot()
+                    bandera_Yolo = True
+                    resized_2 = resized.copy() 
 
 
-                yolo_count += 1
-
-                if bandera == False:
-
-                  # -------- INFERENCIA YOLO --------
-                    results = model(
-                    resized, 
-                    verbose=False,
-                    conf=YOLO_CONF  # Confianza mínima = más rápido
-                    )
-
-            # -------- DIBUJAR RESULTADOS --------
-                    annotated = results[0].plot()
-
-            # -------- LÓGICA DE DETECCIÓN --------
-                    detected = False
                     for i,cls_id in enumerate(results[0].boxes.cls.tolist()):
-                            class_name = results[0].names[int(cls_id)]
-                            if class_name == "Sin_Tapa":
-                                print(f"🎯 Objeto detectado: {class_name}")
-                                x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
-                                cx = int((x1 + x2 )/ 2)
-                                cy = int((y1 + y2 )/ 2)
-                                cv2.circle(annotated,(cx,cy),10,(0,0,255), 2)
-                                cx = cx * escala_x
-                                cy = cy * escala_y
-                                print(f"Objeto Sin tapa en X:{cx}, Y {cy}")
-                                
-                                #save_detection(frame_yolo, class_name)
-                                resized_2 = resized 
-                                bandera = True
+                        class_name = results[0].names[int(cls_id)]
+                        cof = results[0].boxes.conf[i].item()
+                        if class_name == "Sin_Tapa":
+                            print(f"🎯 Objeto detectado: {class_name} - Confianza {cof:.2f}")
+                            #save_detection(frame_yolo, class_name)
+                            count_sin_tapa+=1
+                            count_rechazo = 0
+                            camera.dio.do0.user_output = 1
+                            salida  = str(camera.dio.do0.user_output)
+                            print("DO high " + salida)
+                            x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
+                            calculo_posicion_obj(x1,y1,x2,y2,class_name)
+                        if class_name == "Con_Tapa":
+                            print(f"🎯 Objeto detectado: {class_name} - Confianza {cof:.2f}")
+                            count_con_tapa+=1
+                            x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
+                            calculo_posicion_obj(x1,y1,x2,y2,class_name)
+                            
 
-                            if class_name == "Con_Tapa":
-                                print(f"🎯 Objeto detectado: {class_name}")
-                                x1,y1,x2,y2 = results[0].boxes.xyxy[i].tolist()
-                                cx = int((x1 + x2 )/ 2)
-                                cy = int((y1 + y2 )/ 2)
-                                cv2.circle(annotated,(int(x1),int(y1)),10,(255,34,234), 2)
-                                cv2.circle(annotated,(int(x2),int(y2)),10,(195,4,10), 2)
-                                cv2.circle(annotated,(cx,cy),10,(255,0,0), 2)
-                                #cx = cx * escala_x
-                                #cy = cy * escala_y
-                               
-                                print(f"Objeto con tapa en X:{cx}, Y {cy}")
-                               
-                                resized_2 = resized 
-                                bandera = True
-
-                  
-                
-                if annotated is not None:
-                    cv2.imshow("iCAM-540 + YOLO (Optimizado)", annotated)
+                    cv2.imshow("Vista Camara",frame_yolo)
+                    print(f"Con tapa :{count_con_tapa}, Sin Tapa {count_sin_tapa}")
                 else:
-                    cv2.imshow("iCAM-540 + YOLO (Optimizado)", resized)
 
-            # -------- CONTAR FPS --------
-            now = time.time()
-            if now - last_fps_time >= 1.0:
-                cam_fps = cam_count
-                yolo_fps = yolo_count
-                cam_count = 0
-                yolo_count = 0
-                last_fps_time = now
-                print(f"📊 FPS → Cámara: {cam_fps} | YOLO: {yolo_fps}")
+                    if frame_yolo is not None:
+                        cv2.imshow("Vista Camara",frame_yolo)
+                    else:
+
+                        cv2.imshow("Vista Camara",resized)
 
             # -------- CONTROLES TECLADO --------
             key = cv2.waitKey(1) & 0xFF
@@ -328,8 +335,6 @@ if __name__ == "__main__":
                     print(f"❌ Error sharpness d: {e}")
                     pass
 
-
-
                 #BRIGTHNESS
             elif key == ord('x') or key == ord('X'):  # BRIGTHNESS AUMENTAR
                 try:
@@ -353,7 +358,7 @@ if __name__ == "__main__":
                     pass    
             elif key == ord('s'):  # Captura manual
                 if latest_frame is not None:
-                    save_detection(annotated, "Manual")
+                    save_detection(frame_yolo, "Manual")
             elif key == ord('t'):  
                     
                     camera.dio.do0.user_output = 1
